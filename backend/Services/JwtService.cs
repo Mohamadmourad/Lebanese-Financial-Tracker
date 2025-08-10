@@ -1,3 +1,5 @@
+using backend.Models;
+using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Configuration;
 using Microsoft.IdentityModel.Tokens;
 using System;
@@ -10,11 +12,12 @@ namespace backend.Services
     public class JwtService
     {
         private readonly string _secretKey;
+        private readonly UserService _userService;
 
-        public JwtService(IConfiguration config)
+        public JwtService(IConfiguration config, UserService userService)
         {
-        
             _secretKey = config["Jwt:Key"];
+            _userService = userService;
         }
 
         public string GenerateToken(string userId)
@@ -44,7 +47,7 @@ namespace backend.Services
                 {
                     ValidateIssuer = false,
                     ValidateAudience = false,
-                    ValidateLifetime = false,
+                    ValidateLifetime = false, 
                     ValidateIssuerSigningKey = true,
                     IssuerSigningKey = new SymmetricSecurityKey(key)
                 }, out SecurityToken validatedToken);
@@ -56,6 +59,19 @@ namespace backend.Services
             {
                 return null;
             }
+        }
+        public async Task<User?> GetUserFromContext(HttpContext context)
+        {
+            var token = context.Request.Cookies["jwt"];
+            if (string.IsNullOrEmpty(token))
+                return null;
+
+            var userId = VerifyToken(token);
+            if (string.IsNullOrEmpty(userId))
+                return null;
+
+            var user = await _userService.GetUserByIdAsync(userId);
+            return user;
         }
     }
 }

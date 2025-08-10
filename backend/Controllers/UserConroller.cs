@@ -58,6 +58,12 @@ namespace backend.Controllers
                 newUser = await _userService.CreateUser(newUser);
                 string jwtToken = _jwtService.GenerateToken(newUser.Id);
                 Console.WriteLine(jwtToken);
+                Response.Cookies.Append("jwt", jwtToken, new CookieOptions
+                {
+                    HttpOnly = true,
+                    Secure = true,
+                    SameSite = SameSiteMode.Strict,
+                });
 
                 return Ok(new { jwtToken });
             }
@@ -67,7 +73,7 @@ namespace backend.Controllers
                 return StatusCode(500, "An error occurred during signup.");
             }
         }
-        
+
         [HttpPost("login")]
         public async Task<IActionResult> Login([FromBody] LoginDto body)
         {
@@ -76,15 +82,22 @@ namespace backend.Controllers
                 if (string.IsNullOrEmpty(body.Email) ||
                     string.IsNullOrEmpty(body.Password))
                 {
-                    return BadRequest(new {message = "all fields are required"});
+                    return BadRequest(new { message = "all fields are required" });
                 }
 
                 var (isAvailable, reason) = await _userService.LoginUser(body.Email, body.Password);
                 if (!isAvailable)
-                    return BadRequest(new {message = reason});
+                    return BadRequest(new { message = reason });
 
                 string jwtToken = _jwtService.GenerateToken(reason);
                 Console.WriteLine(jwtToken);
+
+                Response.Cookies.Append("jwt", jwtToken, new CookieOptions
+                {
+                    HttpOnly = true,
+                    Secure = true,
+                    SameSite = SameSiteMode.Strict,
+                });
 
                 return Ok(new { jwtToken });
             }
@@ -92,6 +105,33 @@ namespace backend.Controllers
             {
                 Console.WriteLine($"Login error: {ex}");
                 return StatusCode(500, "An error occurred during login.");
+            }
+        }
+        
+        [HttpGet("checkAuth")]
+        public async Task<IActionResult> checkAuth()
+        {
+            try
+            {
+                var currentUser = HttpContext.Items["User"] as User;
+                if (currentUser == null)
+                {
+                    return StatusCode(500, "Unauthaurized");
+                }
+                var safeUser = new UserDto
+                {
+                    Username = currentUser.Username,
+                    Email = currentUser.Email,
+                    Description = currentUser.Description,
+                    AmountInUsd = currentUser.AmountInUsd,
+                    AmountInLbn = currentUser.AmountInLbn
+                };
+                return Ok(new { user = safeUser });
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Checking Login error: {ex}");
+                return StatusCode(500, "An error occurred while checkin login.");
             }
         }
 
